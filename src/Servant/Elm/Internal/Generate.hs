@@ -201,7 +201,8 @@ generateElmForRequest opts request =
 mkTypeSignature :: ElmOptions -> F.Req ElmDatatype -> Doc
 mkTypeSignature opts request =
   (hsep . punctuate " ->" . concat)
-    [ catMaybes [urlPrefixType]
+    [ catMaybes [msgHandlerType]
+    , catMaybes [urlPrefixType]
     , headerTypes
     , urlCaptureTypes
     , queryTypes
@@ -242,10 +243,14 @@ mkTypeSignature opts request =
     bodyType =
         fmap elmTypeRef $ request ^. F.reqBody
 
-    returnType :: Maybe Doc
-    returnType = do
+    msgHandlerType :: Maybe Doc
+    msgHandlerType = do
       result <- fmap elmTypeRef $ request ^. F.reqReturnType
-      pure ("Http.Request" <+> parens result)
+      pure $ "(Result Http.Error" <+> parens result <+> "-> msg)"
+
+    returnType :: Maybe Doc
+    returnType =
+      pure "Cmd msg"
 
 
 elmHeaderArg :: F.HeaderArg ElmDatatype -> Doc
@@ -285,7 +290,9 @@ mkArgs
   -> Doc
 mkArgs opts request =
   (hsep . concat) $
-    [ -- Dynamic url prefix
+    [ -- Message handler type
+      ["msgHandler"]
+    , -- Dynamic url prefix
       case urlPrefix opts of
         Dynamic -> ["urlBase"]
         Static _ -> []
@@ -370,8 +377,8 @@ mkRequest opts request =
          indent i expect
        , "timeout =" <$>
          indent i "Nothing"
-       , "withCredentials =" <$>
-         indent i "False"
+       , "tracker =" <$>
+         indent i "Nothing"
        ])
   where
     method =
@@ -417,7 +424,7 @@ mkRequest opts request =
           let elmConstructor =
                 Elm.toElmTypeRefWith (elmExportOptions opts) elmTypeExpr
           in
-            "Http.expectStringResponse" <$>
+            "Http.expectString msgHandler" <$>
             indent i (parens (backslash <> "res" <+> "->" <$>
                               indent i ("if String.isEmpty res.body then" <$>
                                         indent i "Ok" <+> stext elmConstructor <$>
@@ -426,7 +433,7 @@ mkRequest opts request =
 
 
         Just elmTypeExpr ->
-          "Http.expectJson" <+> stext (Elm.toElmDecoderRefWith (elmExportOptions opts) elmTypeExpr)
+          "Http.expectJson msgHandler" <+> stext (Elm.toElmDecoderRefWith (elmExportOptions opts) elmTypeExpr)
 
         Nothing ->
           error "mkHttpRequest: no reqReturnType?"
