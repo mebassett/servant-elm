@@ -8,13 +8,12 @@ packages:
 - location: '.'
 - location: 
       git: git@github.com:mebassett/elm-export.git
-      commit: 311a65c167d2e2e767264125cee81b3754f52b6c
+      commit: c54c6a46b0e3a920a26e22585cb97b71785e6ac6
   extra-dep: true
 
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- meb-elm-export-0.6.0.2
 
 # Override default flag values for local packages and extra-deps
 flags: {}
