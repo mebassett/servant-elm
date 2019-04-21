@@ -41,7 +41,7 @@ library
   ghc-options:         -Wall
   default-language:    Haskell2010
 
-test-suite meb-servant-elm-test
+test-suite servant-elm-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             GenerateSpec.hs
@@ -51,15 +51,15 @@ test-suite meb-servant-elm-test
                      , HUnit
                      , aeson >= 0.9
                      , base
-                     , meb-elm-export      >= 0.5
+                     , elm-export      >= 0.7
                      , hspec
                      , servant
-                     , meb-servant-elm
+                     , servant-elm
                      , text
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   default-language:    Haskell2010
 
-test-suite meb-servant-elm-test-integration
+test-suite servant-elm-test-integration
   if !flag(integration)
     Buildable:         False
   type:                exitcode-stdio-1.0
@@ -69,13 +69,13 @@ test-suite meb-servant-elm-test-integration
   build-depends:       aeson >= 0.9
                       , base
                       , directory
-                      , meb-elm-export      >= 0.5
+                      , elm-export      >= 0.7
                       , hspec
                       , interpolate
                       , mockery
                       , process
                       , servant
-                      , meb-servant-elm
+                      , servant-elm
                       , text
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   default-language:    Haskell2010
@@ -89,9 +89,9 @@ executable books-example
     Buildable:         False
   main-is:             generate.hs
   build-depends:       base >= 4.7 && < 5
-                     , meb-elm-export      >= 0.5
+                     , elm-export      >= 0.7
                      , servant >= 0.8
-                     , meb-servant-elm
+                     , servant-elm
   hs-source-dirs:      examples/books
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
@@ -101,9 +101,9 @@ executable e2e-tests-example
     Buildable:         False
   main-is:             generate.hs
   build-depends:       base >= 4.7 && < 5
-                     , meb-elm-export      >= 0.5
+                     , elm-export      >= 0.7
                      , servant >= 0.8
-                     , meb-servant-elm
+                     , servant-elm
   hs-source-dirs:      examples/e2e-tests
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
@@ -113,9 +113,9 @@ executable giphy-example
     Buildable:         False
   main-is:             generate.hs
   build-depends:       base >= 4.7 && < 5
-                     , meb-elm-export >= 0.5
+                     , elm-export >= 0.7
                      , servant >= 0.8
-                     , meb-servant-elm
+                     , servant-elm
                      , text
   hs-source-dirs:      examples/giphy
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
@@ -126,9 +126,9 @@ executable readme-example
     Buildable:         False
   main-is:             generate.hs
   build-depends:       base >= 4.7 && < 5
-                     , meb-elm-export >= 0.5
+                     , elm-export >= 0.7
                      , servant >= 0.8
-                     , meb-servant-elm
+                     , servant-elm
   hs-source-dirs:      examples/readme-example
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010

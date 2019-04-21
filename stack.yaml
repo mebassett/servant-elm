@@ -8,7 +8,7 @@ packages:
 - location: '.'
 - location: 
       git: git@github.com:mebassett/elm-export.git
-      commit: c54c6a46b0e3a920a26e22585cb97b71785e6ac6
+      commit: f71d9cc9df4c012232452e70c394375eaa1023d1
   extra-dep: true
 
 
