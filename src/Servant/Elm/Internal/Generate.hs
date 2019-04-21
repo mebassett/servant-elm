@@ -12,7 +12,7 @@ import           Data.Text                    (Text)
 import qualified Data.Text                    as T
 import qualified Data.Text.Lazy               as L
 import qualified Data.Text.Encoding           as T
-import           Elm                          (ElmDatatype)
+import           Elm                          (ElmDatatype(..), ElmPrimitive(..))
 import qualified Elm
 import           Servant.API                  (NoContent (..))
 import           Servant.Elm.Internal.Foreign (LangElm, getEndpoints)
@@ -198,6 +198,7 @@ mkTypeSignature opts request =
     headerTypes =
       [ header ^. F.headerArg . F.argType . to elmTypeRef
       | header <- request ^. F.reqHeaders
+      , isNotCookie header
       ]
 
     urlCaptureTypes :: [Doc]
@@ -209,15 +210,8 @@ mkTypeSignature opts request =
 
     queryTypes :: [Doc]
     queryTypes =
-      [ arg ^. F.queryArgName . F.argType . to (elmTypeRef . wrapper)
+      [ arg ^. F.queryArgName . F.argType . to elmTypeRef
       | arg <- request ^. F.reqUrl . F.queryStr
-      , wrapper <- [
-          case arg ^. F.queryArgType of
-            F.Normal ->
-              Elm.ElmPrimitive . Elm.EMaybe
-            _ ->
-              id
-          ]
       ]
 
     bodyType :: Maybe Doc
@@ -253,6 +247,14 @@ elmBodyArg =
   "body"
 
 
+isNotCookie :: F.HeaderArg f -> Bool
+isNotCookie header =
+   header
+     ^. F.headerArg
+      . F.argName
+      . to ((/= "cookie") . T.toLower . F.unPathSegment)
+
+
 mkArgs
   :: ElmOptions
   -> F.Req ElmDatatype
@@ -266,6 +268,7 @@ mkArgs opts request =
     , -- Headers
       [ elmHeaderArg header
       | header <- request ^. F.reqHeaders
+      , isNotCookie header
       ]
     , -- URL Captures
       [ elmCaptureArg segment
@@ -299,30 +302,32 @@ mkLetParams opts request =
       case qarg ^. F.queryArgType of
         F.Normal ->
           let
+            argType = qarg ^. F.queryArgName . F.argType
+            wrapped = isElmMaybeType argType
             -- Don't use "toString" on Elm Strings, otherwise we get extraneous quotes.
             toStringSrc =
-              if isElmStringType opts (qarg ^. F.queryArgName . F.argType) then
+              if isElmStringType opts argType || isElmMaybeStringType opts argType then
                 ""
               else
                 "toString >> "
           in
-              name <$>
-              indent 4 ("|> Maybe.map" <+> parens (toStringSrc <> "Http.encodeUri >> (++)" <+> dquotes (elmName <> equals)) <$>
+              (if wrapped then elmName else "Just" <+> elmName) <$>
+              indent 4 ("|> Maybe.map" <+> parens (toStringSrc <> "Http.encodeUri >> (++)" <+> dquotes (name <> equals)) <$>
                         "|> Maybe.withDefault" <+> dquotes empty)
 
         F.Flag ->
-            "if" <+> name <+> "then" <$>
+            "if" <+> elmName <+> "then" <$>
             indent 4 (dquotes (name <> equals)) <$>
             indent 2 "else" <$>
             indent 4 (dquotes empty)
 
         F.List ->
-            name <$>
+            elmName <$>
             indent 4 ("|> List.map" <+> parens (backslash <> "val ->" <+> dquotes (name <> "[]=") <+> "++ (val |> toString |> Http.encodeUri)") <$>
                       "|> String.join" <+> dquotes "&")
       where
-        name = elmQueryArg qarg
-        elmName= qarg ^. F.queryArgName . F.argName . to (stext . F.unPathSegment)
+        elmName = elmQueryArg qarg
+        name = qarg ^. F.queryArgName . F.argName . to (stext . F.unPathSegment)
 
 
 mkRequest :: ElmOptions -> F.Req ElmDatatype -> Doc
@@ -334,7 +339,7 @@ mkRequest opts request =
          indent i (dquotes method)
        , "headers =" <$>
          indent i
-           (elmList headers)
+           (elmListOfMaybes headers)
        , "url =" <$>
          indent i url
        , "body =" <$>
@@ -350,17 +355,26 @@ mkRequest opts request =
     method =
        request ^. F.reqMethod . to (stext . T.decodeUtf8)
 
+    mkHeader header =
+      let headerName = header ^. F.headerArg . F.argName . to (stext . F.unPathSegment)
+          headerArgName = elmHeaderArg header
+          argType = header ^. F.headerArg . F.argType
+          wrapped = isElmMaybeType argType
+          toStringSrc =
+            if isElmMaybeStringType opts argType || isElmStringType opts argType then
+              mempty
+            else
+              " << toString"
+      in
+        "Maybe.map" <+> parens (("Http.header" <+> dquotes headerName <> toStringSrc))
+        <+>
+        (if wrapped then headerArgName else parens ("Just" <+> headerArgName))
+
     headers =
-        [("Http.header" <+> dquotes headerName <+>
-                 (if isElmStringType opts (header ^. F.headerArg . F.argType) then
-                     headerArgName
-                   else
-                     parens ("toString " <> headerArgName)
-                  ))
-        | header <- request ^. F.reqHeaders
-        , headerName <- [header ^. F.headerArg . F.argName . to (stext . F.unPathSegment)]
-        , headerArgName <- [elmHeaderArg header]
-        ]
+      [ mkHeader header
+      | header <- request ^. F.reqHeaders
+      , isNotCookie header
+      ]
 
     url =
       mkUrl opts (request ^. F.reqUrl . F.path)
@@ -454,6 +468,16 @@ isElmStringType :: ElmOptions -> ElmDatatype -> Bool
 isElmStringType opts elmTypeExpr =
   elmTypeExpr `elem` stringElmTypes opts
 
+{- | Determines whether a type is 'Maybe a' where 'a' is something akin to a 'String'.
+-}
+isElmMaybeStringType :: ElmOptions -> ElmDatatype -> Bool
+isElmMaybeStringType opts (ElmPrimitive (EMaybe elmTypeExpr)) = elmTypeExpr `elem` stringElmTypes opts
+isElmMaybeStringType _ _ = False
+
+isElmMaybeType :: ElmDatatype -> Bool
+isElmMaybeType (ElmPrimitive (EMaybe _)) = True
+isElmMaybeType _ = False
+
 
 -- Doc helpers
 
@@ -471,3 +495,7 @@ elmRecord = encloseSep (lbrace <> space) (line <> rbrace) (comma <> space)
 elmList :: [Doc] -> Doc
 elmList [] = lbracket <> rbracket
 elmList ds = lbracket <+> hsep (punctuate (line <> comma) ds) <$> rbracket
+
+elmListOfMaybes :: [Doc] -> Doc
+elmListOfMaybes [] = lbracket <> rbracket
+elmListOfMaybes ds = "List.filterMap identity" <$> indent 4 (elmList ds)
