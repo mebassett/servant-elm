@@ -37,6 +37,7 @@ library
                      , servant
                      , servant-auth-server
                      , servant-foreign
+                     , servant-server
                      , text
                      , wl-pprint-text
   ghc-options:         -Wall

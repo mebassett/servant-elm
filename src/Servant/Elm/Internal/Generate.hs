@@ -244,9 +244,13 @@ mkTypeSignature opts request =
         fmap elmTypeRef $ request ^. F.reqBody
 
     msgHandlerType :: Maybe Doc
-    msgHandlerType = do
-      result <- fmap elmTypeRef $ request ^. F.reqReturnType
-      pure $ "(Result Http.Error" <+> parens result <+> "-> msg)"
+    msgHandlerType = 
+      case request ^. F.reqReturnType of
+        Just elmTypeExpr | isEmptyType opts elmTypeExpr ->
+          pure "(Result Http.Error () -> msg)"
+        mElmTypeExpr -> do
+          result <- fmap elmTypeRef $ mElmTypeExpr
+          pure $ "(Result Http.Error" <+> parens result <+> "-> msg)"
 
     returnType :: Maybe Doc
     returnType =
@@ -421,16 +425,7 @@ mkRequest opts request =
     expect =
       case request ^. F.reqReturnType of
         Just elmTypeExpr | isEmptyType opts elmTypeExpr ->
-          let elmConstructor =
-                Elm.toElmTypeRefWith (elmExportOptions opts) elmTypeExpr
-          in
-            "Http.expectString msgHandler" <$>
-            indent i (parens (backslash <> "res" <+> "->" <$>
-                              indent i ("if String.isEmpty res.body then" <$>
-                                        indent i "Ok" <+> stext elmConstructor <$>
-                                        "else" <$>
-                                        indent i ("Err" <+> dquotes "Expected the response body to be empty")) <> line))
-
+          "Http.expectWhatever msgHandler"
 
         Just elmTypeExpr ->
           "Http.expectJson msgHandler" <+> stext (Elm.toElmDecoderRefWith (elmExportOptions opts) elmTypeExpr)
